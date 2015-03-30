@@ -1,0 +1,4 @@
+rootProject.name = 'MoogleKiwi'
+include 'Java'
+rootProject.children.find { it.name == 'Java' }.name = 'MoogleKiwiJava'
+

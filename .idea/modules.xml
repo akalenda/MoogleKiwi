@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/MoogleKiwi.iml" filepath="$PROJECT_DIR$/MoogleKiwi.iml" />
+      <module fileurl="file://$PROJECT_DIR$/MoogleKiwiJava/MoogleKiwiJava.iml" filepath="$PROJECT_DIR$/MoogleKiwiJava/MoogleKiwiJava.iml" />
+    </modules>
+  </component>
+</project>
