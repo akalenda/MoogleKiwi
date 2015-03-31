@@ -1,4 +1,5 @@
 apply plugin: 'java'
+apply plugin: 'idea'
 
 sourceCompatibility = 1.5
 version = '1.0'
@@ -8,8 +9,15 @@ repositories {
 }
 
 dependencies {
-    testCompile group: 'junit', name: 'junit', version: '4.11'
-    classpath 'net.ltgt.gradle:gradle-errorprone-plugin:latest.release'
+    // main source set, "compile" scope in IntelliJ
+    compile(group: 'com.google.guava', name: 'guava', version: '18.0')
+
+    // test source set, "test" scope in IntelliJ
+    testCompile(group: 'junit', name: 'junit', version: '4.11')
 }
 
-apply plugin: 'errorprone'
+idea {
+    module {
+        scopes.COMPILE.plus += [ project.configurations.compile ]
+    }
+}
