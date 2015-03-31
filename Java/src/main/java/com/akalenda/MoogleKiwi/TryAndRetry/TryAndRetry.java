@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @author https://github.com/akalenda
  */
+@SuppressWarnings("unused")
 public class TryAndRetry {
 
     private static RetryingThreadPoolExecutor factory() {

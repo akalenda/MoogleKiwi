@@ -1,19 +1,13 @@
 package com.akalenda.MoogleKiwi.TryAndRetry;
 
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionHandler;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
+import java.util.concurrent.*;
+import java.util.function.Predicate;
+
+@SuppressWarnings("unused")
 public class RetryingThreadPoolExecutor extends ThreadPoolExecutor {
 
     /* ************************ Fields ********************************************************/
@@ -203,8 +197,7 @@ public class RetryingThreadPoolExecutor extends ThreadPoolExecutor {
 
     private TryAndRetryFailuresException compositeOf (ImmutableList<Exception> immutableList) throws TryAndRetryFailuresException {
         TryAndRetryFailuresException tarfExc = new TryAndRetryFailuresException(attemptsMade);
-        for (Exception e : immutableList)
-            tarfExc.addSuppressed(e);
+        immutableList.forEach(tarfExc::addSuppressed);
         return tarfExc;
     }
 }
