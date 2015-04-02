@@ -1,20 +1,16 @@
 package com.akalenda.MoogleKiwi.TryAndRetry;
 
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.TimeUnit;
-
-
 /**
- * Example usage:
- * <pre>
- * myConnection = TryAndRetry.
- *      withAttemptsUpTo(5).
- *      withWaitPeriod(1, TimeUnit.MINUTES).
- *      linearlyIncreasingBy(30, TimeUnit.SECONDS).
- *      upTo(10, TimeUnit.MINUTES).
- *      withAsyncExceptionHandler(exception -> logger.catching(exception)).
- *      executeUntilDoneThenGet(() -> getConnectionToRemote());
- * </pre>
+ * This is a front-end for {@link TryAndRetryTask}. The purpose of this package is to provide a convenient abstraction for my commonly used Try-catch-retry patterns. It uses a fluid builder pattern, so you can let your IDE take you through the options. Once your desired options are set, you can run the task with a {@code execute} variation, or {@code continue} if you don't want the state to reset. Example usage:
+ * <pre> {@code
+ * myConnection = TryAndRetry
+ *      .withAttemptsUpTo(5)
+ *      .withWaitPeriod(1, TimeUnit.MINUTES)
+ *      .linearlyIncreasingBy(30, TimeUnit.SECONDS)
+ *      .upTo(10, TimeUnit.MINUTES)
+ *      .withAsyncExceptionHandler(exception -> logger.catching(exception))
+ *      .executeUntilDoneThenGet(() -> getConnectionToRemote());
+ * }</pre>}
  *
  * TODO look at sTrace
  *
@@ -23,21 +19,12 @@ import java.util.concurrent.TimeUnit;
 @SuppressWarnings("unused")
 public class TryAndRetry {
 
-    private static RetryingThreadPoolExecutor factory() {
-        return new RetryingThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS,
-                new SynchronousQueue<>());
+    public static TryAndRetryTask perpetually() {
+        return new TryAndRetryTask();
     }
 
-    public static RetryingThreadPoolExecutor perpetually() {
-        return factory().perpetually();
-    }
-
-    public static RetryingThreadPoolExecutor withAttemptsUpTo(int attemptsAllowed) {
-        return factory().withAttemptsUpTo(attemptsAllowed);
-    }
-
-    public static void main (String[] args) {
-        System.out.println("Hello world");
+    public static TryAndRetryTask withAttemptsUpTo(int attemptsAllowed) {
+        return new TryAndRetryTask(attemptsAllowed);
     }
 }
 
