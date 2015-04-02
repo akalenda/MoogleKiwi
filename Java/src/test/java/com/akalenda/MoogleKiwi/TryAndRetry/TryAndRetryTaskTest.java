@@ -13,9 +13,10 @@ public class TryAndRetryTaskTest extends TestCase {
 
     private final Semaphore semaphore = new Semaphore(1);
 
-
+    // TODO: These need to have their behavior monitored inside the debugger with breakpoints, I might have bungled the tests after all...
     public void testWithAsyncExceptionHandler() throws Exception {
         Instant start = Instant.now();
+        Semaphore failOnce = new Semaphore(1);
         TryAndRetry
                 .withAttemptsUpTo(2)
                 .withAsyncExceptionHandler(exception -> {
@@ -24,11 +25,16 @@ public class TryAndRetryTaskTest extends TestCase {
                     } catch (InterruptedException ignored) {}
                     return true;
                 })
-                .executeUntilDoneThenGet(() -> true);
+                .executeUntilDoneThenGet(() -> {
+                    if (failOnce.tryAcquire())
+                        throw new Exception("Force the exception handler to trigger");
+                    return true;
+                });
         long timeToFinish = Duration.between(start, Instant.now()).toMillis();
         assertTrue(timeToFinish < 500 * 1000);
     }
 
+    // TODO: This doesn't test to see that the exception handler actually is blocking execution. e.g. The TryAndRetry loop should be waiting for the handler to finish before moving on to the next attempt. This doesn't explicitly test that; rather, it's just testing to see that the exception occurs at all.
     public void testWithBlockingExceptionHandler() throws Exception {
         Semaphore waitForExceptionToBeHandled = new Semaphore(0);
         Boolean handlerWorked = TryAndRetry
@@ -78,7 +84,7 @@ public class TryAndRetryTaskTest extends TestCase {
         assertTrue(TryAndRetry
             .withAttemptsUpTo(1)
             .executeUntilDoneThenGet(() -> {
-                Thread.sleep(10 * 1000);
+                Thread.sleep(2 * 1000);
                 return true;
             })
         );
