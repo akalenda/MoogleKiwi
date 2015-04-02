@@ -81,13 +81,16 @@ public class TryAndRetryTaskTest extends TestCase {
     }
 
     public void testExecuteUntilDoneThenGet() throws Exception {
-        assertTrue(TryAndRetry
+        Instant start = Instant.now();
+        long timeToSleepMillis = 2 * 1000;
+        Instant end = TryAndRetry
             .withAttemptsUpTo(1)
             .executeUntilDoneThenGet(() -> {
-                Thread.sleep(2 * 1000);
-                return true;
-            })
-        );
+                Thread.sleep(timeToSleepMillis);
+                return Instant.now();
+            });
+        long timeToFinish = Duration.between(start, end).toMillis();
+        assertTrue (timeToFinish >= timeToSleepMillis);
     }
 
     /*
