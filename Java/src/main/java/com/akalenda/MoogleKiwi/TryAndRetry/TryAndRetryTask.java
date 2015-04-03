@@ -122,16 +122,12 @@ public class TryAndRetryTask {
 
   /* ************************************* Execution *******************************************/
 
-    /**
-     * Hmm I dont think this one is ready to use
-     * TODO I dont like this business of putting a null in the future when it fails. There has got to be a way to have the exception bubble out.
-     */
     public <T> CompletableFuture<T> executeAsync(Callable<T> lambda) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return executeUntilDoneThenGet(lambda);
             } catch (TryAndRetryFailuresException e) {
-                return null;
+                throw new RuntimeException(e);
             }
         });
     }
