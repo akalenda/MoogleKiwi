@@ -15,6 +15,7 @@ public class TryAndRetryTaskTest extends TestCase {
 
     /**
      * Tests to see that the given exception handler completes asynchronously, e.g. without blocking the execution of the main task.
+     *
      * @throws Exception
      */
     public void testWithAsyncExceptionHandler() throws Exception {
@@ -48,6 +49,7 @@ public class TryAndRetryTaskTest extends TestCase {
 
     /**
      * This test simply checks to see whether a given exception handler will be executed when an exception is caught. It does not, however, check to see that the handler blocks execution.
+     *
      * @throws Exception
      */
     public void testWithBlockingExceptionHandler() throws Exception {
@@ -68,6 +70,7 @@ public class TryAndRetryTaskTest extends TestCase {
 
     /**
      * This is a variation on the previous test. It checks to see not only that the exception handler is invoked, but that another attempt in the Try-Retry loop is not made until the exception handler finishes.
+     *
      * @throws Exception
      */
     public void testWithBlockingExceptionHandler_actuallyIsBlocking() throws Exception {
@@ -129,42 +132,46 @@ public class TryAndRetryTaskTest extends TestCase {
         Instant start = Instant.now();
         long timeToSleepMillis = 2 * 1000;
         Instant end = TryAndRetry
-            .withAttemptsUpTo(1)
-            .executeUntilDoneThenGet(() -> {
-                try {
-                    Thread.sleep(timeToSleepMillis);
-                    return Instant.now();
-                } catch (InterruptedException e) {
-                    return null; // Results in test failure, as desired
-                }
-            });
+                .withAttemptsUpTo(1)
+                .executeUntilDoneThenGet(() -> {
+                    try {
+                        Thread.sleep(timeToSleepMillis);
+                        return Instant.now();
+                    } catch (InterruptedException e) {
+                        return null; // Results in test failure, as desired
+                    }
+                });
         long timeToFinish = Duration.between(start, end).toMillis();
-        assertTrue (timeToFinish >= timeToSleepMillis);
+        assertTrue(timeToFinish >= timeToSleepMillis);
     }
 
     public void testContinueUntilDoneThenGet() throws Exception {
-        int attemptsPerWave = 55;
+        int attemptsFirstWave = 20;
+        int attemptsTotal = 55;
         AtomicInteger totalAttemptsMade = new AtomicInteger(0);
-        TryAndRetryTask testTask = TryAndRetry.withAttemptsUpTo(attemptsPerWave * 2);
+        TryAndRetryTask testTask = TryAndRetry.withAttemptsUpTo(attemptsTotal);
         testTask.executeUntilDoneThenGet(() -> {
             totalAttemptsMade.incrementAndGet();
-            if (totalAttemptsMade.get() < 20)
+            if (totalAttemptsMade.get() < attemptsFirstWave)
                 throw new Exception("...so as to retry 20 times");
             return true;
         });
+        assertEquals(attemptsFirstWave, totalAttemptsMade.get());
         try {
             testTask.continueUntilDoneThenGet(() -> {
                 totalAttemptsMade.incrementAndGet();
                 throw new Exception("...so as to continue retrying until all attempts are used");
             });
-        } catch (TryAndRetryFailuresException ignored) {}
-        assertEquals(attemptsPerWave * 2, totalAttemptsMade.get());
+        } catch (TryAndRetryFailuresException ignored) {
+        }
+        assertEquals(attemptsTotal, totalAttemptsMade.get());
     }
 
     /* ***************** Tests that only exist for 100% code coverage ****************************************/
 
     /**
      * Tests whether the wait period between attempts is near-instantaneous, e.g. is truncated to zero milliseconds
+     *
      * @throws Exception
      */
     public void testWithNoWaitPeriod() throws Exception {

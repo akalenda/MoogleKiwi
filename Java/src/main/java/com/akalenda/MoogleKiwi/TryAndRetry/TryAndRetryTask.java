@@ -4,10 +4,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 import java.util.concurrent.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
  * @author https://github.com/akalenda
+ * @see {@link TryAndRetry}
  */
 @SuppressWarnings("unused")
 public class TryAndRetryTask {
@@ -21,7 +23,7 @@ public class TryAndRetryTask {
     private long currentWaitPeriod = 0; // milliseconds
     private long waitPeriodIncrement = 0; // milliseconds
     private long waitPeriodCap = -1; // milliseconds
-    private long currentDelta; // milliseconds
+    private long currentDelta = 0; // milliseconds
 
     private boolean isPerpetual = true;
     private boolean isLogarithmicallyIncreasing = false;
@@ -30,16 +32,14 @@ public class TryAndRetryTask {
     /* ********************************** Constructors *****************************************/
 
     /**
-     * Creates a task that will run perpetually until it is successful. (Or, see {@link #withBlockingExceptionHandler(Predicate)}.)
+     * @see {@link TryAndRetry#perpetually()} }
      */
     TryAndRetryTask() {
         isPerpetual = true;
     }
 
     /**
-     * Creates a task that will run perpetually until it is successful, or it has tried and retried as many times as is allowed. (Or, see {@link #withBlockingExceptionHandler(Predicate)}.)
-     *
-     * @param attemptsAllowed - Must be a positive number; this is how many times it will try and retry before aborting.
+     * @see {@link TryAndRetry#withAttemptsUpTo(int)}
      */
     TryAndRetryTask(int attemptsAllowed) {
         Preconditions.checkArgument(attemptsAllowed > 0, "Expected positive number for attemptsAllowed, got " + attemptsAllowed);
@@ -111,7 +111,8 @@ public class TryAndRetryTask {
     }
 
     /**
-     * @param exceptionHandler - In the case of the blocking exception handler, the supplied Predicate should return true or false: True, if after the exception it is decided that TryAndRetry should continue retrying; False, if it is decided that it should abort. This allows the handler to short-circuit the Try-Retry pattern if needed.
+     * @param exceptionHandler - <p>In the case of the blocking exception handler, the supplied Predicate should return true or false: True, if after the exception it is decided that TryAndRetry should continue retrying; False, if it is decided that it should abort. This allows the handler to short-circuit the Try-Retry pattern if needed.</p>
+     *                         <p>If the exception handler does short-circuit the loop, it will result in a {@link TryAndRetryFailuresException} being thrown.</p>
      */
     public TryAndRetryTask withBlockingExceptionHandler(Predicate<Exception> exceptionHandler) {
         Preconditions.checkNotNull(exceptionHandler);
@@ -122,6 +123,14 @@ public class TryAndRetryTask {
 
   /* ************************************* Execution *******************************************/
 
+    /**
+     * An asynchronous alternative to {@link #executeUntilDoneThenGet(Callable)}.
+     *
+     * @param lambda - A chunk of code to be run in the Try-Retry
+     * @param <T>    - The type of data returned by the given lambda
+     * @return <p>A {@link CompletableFuture} that will contain the return result of the given lambda once it has completed normally.</p>
+     * <p>Depending on how the user invokes TryAndRetry options, it is possible for the lambda to complete exceptionally (e.g. {@link #executeUntilDoneThenGet(Callable)}} threw a {@link TryAndRetryFailuresException}), in which case it will not complete normally, and the return value will never be available. Instead, the CompletableFuture will complete exceptionally. See {@link CompletableFuture#exceptionally(Function)}.</p>
+     */
     public <T> CompletableFuture<T> executeAsync(Callable<T> lambda) {
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -132,12 +141,38 @@ public class TryAndRetryTask {
         });
     }
 
+    /**
+     * A blocking alternative to {@link #executeAsync(Callable)}.
+     *
+     * @param lambda - A chunk of code to be run in the Try-Retry
+     * @param <T>    - The type of data returned by the given lambda
+     * @return - Returns the return result of the given lambda
+     * @throws TryAndRetryFailuresException
+     */
     public <T> T executeUntilDoneThenGet(Callable<T> lambda) throws TryAndRetryFailuresException {
         currentWaitPeriod = initialWaitPeriod;
         currentDelta = initialWaitPeriod;
+        attemptsMade = 0;
         return continueUntilDoneThenGet(lambda);
     }
 
+    /**
+     * <p>An alternative to {@link #executeUntilDoneThenGet(Callable)}, where the state of the TryAndRetryTask is carried over from the execution of previous lambdas. As an example:</p>
+     * <pre>{@code
+     *      TryAndRetryTask tart = TryAndRetry
+     *          .withAttemptsUpTo(20)
+     *          .withWaitPeriod(15, TimeUnit.SECONDS)
+     *          .linearlyIncreasingBy(5, TimeUnit.SECONDS);
+     *      tart.executeUntilDoneThenGet(foo1);
+     *      tart.continueUntilDoneThenGet(foo2);
+     * }</pre>
+     * <p>If {@code foo1} completes on its 5th attempt, then {@code foo2} will begin trying and retrying on the 6th attempt, with a wait period up to 40 seconds.</p>
+     *
+     * @param lambda - A chunk of code to be run in the Try-Retry
+     * @param <T>    - The type of data returned by the given lambda
+     * @return - Returns the return result of the given lambda
+     * @throws TryAndRetryFailuresException
+     */
     public <T> T continueUntilDoneThenGet(Callable<T> lambda) throws TryAndRetryFailuresException {
         checkForConflictingModifiers();
         ImmutableList.Builder<Exception> collectedExceptions = new ImmutableList.Builder<>();
@@ -156,7 +191,7 @@ public class TryAndRetryTask {
                 }
             }
         }
-        throw compositeOf(collectedExceptions.build());
+        throw collapse(collectedExceptions.build());
     }
 
   /* ************************************** Helpers *******************************************/
@@ -172,7 +207,7 @@ public class TryAndRetryTask {
         if (exceptionHandler == null)
             return true;
         if (exceptionHandlerIsBlocking)
-            return exceptionHandler.test(e); // TODO Make sure this is blocking
+            return exceptionHandler.test(e);
         Executors.newSingleThreadExecutor().execute(() -> exceptionHandler.test(e));
         return true;
     }
@@ -188,7 +223,10 @@ public class TryAndRetryTask {
         Thread.sleep(currentWaitPeriod);
     }
 
-    private TryAndRetryFailuresException compositeOf(ImmutableList<Exception> immutableList) throws TryAndRetryFailuresException {
+    /**
+     * Creates a single new exception in which the given list of exceptions are added as suppressed exceptions
+     */
+    private TryAndRetryFailuresException collapse(ImmutableList<Exception> immutableList) {
         TryAndRetryFailuresException tarfExc = new TryAndRetryFailuresException(attemptsMade);
         immutableList.forEach(tarfExc::addSuppressed);
         return tarfExc;
