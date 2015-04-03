@@ -146,7 +146,8 @@ public class TryAndRetryTask {
         checkForConflictingModifiers();
         ImmutableList.Builder<Exception> collectedExceptions = new ImmutableList.Builder<>();
         boolean shouldRetry = true;
-        for (; (isPerpetual || attemptsMade < attemptsAllowed) && shouldRetry; attemptsMade++) {
+        while ((isPerpetual || attemptsMade < attemptsAllowed) && shouldRetry) {
+            attemptsMade++;
             try {
                 return lambda.call();
             } catch (Exception e) {
