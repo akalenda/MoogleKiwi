@@ -22,7 +22,7 @@ public class TryAndRetryTask {
     private long initialWaitPeriod = 0; // milliseconds
     private long currentWaitPeriod = 0; // milliseconds
     private long waitPeriodIncrement = 0; // milliseconds
-    private long waitPeriodCap = -1; // milliseconds
+    private long waitPeriodCap = Long.MAX_VALUE; // milliseconds
     private long currentDelta = 0; // milliseconds
 
     private boolean isPerpetual = true;
@@ -219,7 +219,7 @@ public class TryAndRetryTask {
             currentWaitPeriod += (currentDelta /= 2);
         else
             currentWaitPeriod += waitPeriodIncrement;
-        currentWaitPeriod = Math.max(currentWaitPeriod, waitPeriodCap);
+        currentWaitPeriod = Math.min(currentWaitPeriod, waitPeriodCap);
         Thread.sleep(currentWaitPeriod);
     }
 

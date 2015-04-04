@@ -21,8 +21,6 @@ import java.util.function.Predicate;
  *      .executeUntilDoneThenGet(() -> getConnectionToRemote());
  * }</pre>}
  *
- * TODO look at sTrace
- *
  * @author https://github.com/akalenda
  */
 @SuppressWarnings("unused")

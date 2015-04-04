@@ -11,6 +11,7 @@ public class TryAndRetryTest extends TestCase {
 
     /**
      * Unfortunately the test needs to end at some point, we can't really test whether it runs perpetually. But that's not a big deal, we can assume that if it retries a few times, it will retry however many times.
+     *
      * @throws Exception
      */
     public void testPerpetually() throws Exception {
@@ -33,12 +34,13 @@ public class TryAndRetryTest extends TestCase {
         AtomicInteger attemptsMade = new AtomicInteger(0);
         try {
             TryAndRetry
-                .withAttemptsUpTo(attemptsToMake)
-                .executeUntilDoneThenGet(() -> {
-                    attemptsMade.incrementAndGet();
-                    throw new Exception("...so as to continue retrying until all attempts are used");
-                });
-        } catch (TryAndRetryFailuresException ignored) {}
+                    .withAttemptsUpTo(attemptsToMake)
+                    .executeUntilDoneThenGet(() -> {
+                        attemptsMade.incrementAndGet();
+                        throw new Exception("...so as to continue retrying until all attempts are used");
+                    });
+        } catch (TryAndRetryFailuresException ignored) {
+        }
         assertEquals(attemptsToMake, attemptsMade.get());
     }
 }

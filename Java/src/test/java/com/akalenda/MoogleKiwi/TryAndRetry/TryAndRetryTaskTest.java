@@ -1,5 +1,6 @@
 package com.akalenda.MoogleKiwi.TryAndRetry;
 
+import com.google.common.collect.ImmutableList;
 import junit.framework.TestCase;
 
 import java.time.Duration;
@@ -167,8 +168,6 @@ public class TryAndRetryTaskTest extends TestCase {
         assertEquals(attemptsTotal, totalAttemptsMade.get());
     }
 
-    /* ***************** Tests that only exist for 100% code coverage ****************************************/
-
     /**
      * Tests whether the wait period between attempts is near-instantaneous, e.g. is truncated to zero milliseconds
      *
@@ -192,15 +191,113 @@ public class TryAndRetryTaskTest extends TestCase {
         assertEquals(0, lengthOfWaitPeriod);
     }
 
+    /**
+     * Tests to see that each wait period between attempts is half again the length of the previous wait period (give or take a millisecond).
+     *
+     * @throws Exception
+     */
     public void testLogarithmicallyIncreasing() throws Exception {
-        // TODO
+        Box<Instant> startOfWaitPeriod = new Box<>();
+        Box<Duration> durationOfPreviousWaitPeriod = new Box<>();
+        try {
+            TryAndRetry
+                    .withAttemptsUpTo(20)
+                    .withWaitPeriod(100, TimeUnit.MILLISECONDS)
+                    .logarithmicallyIncreasing()
+                    .executeUntilDoneThenGet(() -> {
+                        if (startOfWaitPeriod.hasContents()) {
+                            Duration durationOfCurrentWaitPeriod = Duration.between(startOfWaitPeriod.unbox(), Instant.now());
+                            double expectedCurrentWaitPeriod = ((double) durationOfPreviousWaitPeriod.unbox().toMillis()) * 1.5;
+                            boolean isCloseEnough = Math.abs((double) durationOfCurrentWaitPeriod.toMillis() - expectedCurrentWaitPeriod) < 1.0;
+                            assertTrue("Old: " + durationOfPreviousWaitPeriod.unbox() + " New: " + durationOfCurrentWaitPeriod, isCloseEnough);
+                            durationOfPreviousWaitPeriod.box(durationOfCurrentWaitPeriod);
+                        }
+                        startOfWaitPeriod.box(Instant.now());
+                        throw new Exception("... so as to force a wait period ");
+                    });
+        } catch (TryAndRetryFailuresException ignored) {
+        }
     }
 
+    /**
+     * Tests to see that the wait period does indeed increase linearly between wait periods
+     *
+     * @throws Exception
+     */
     public void testLinearlyIncreasingBy() throws Exception {
-        // TODO
+        Box<Instant> startOfWaitPeriod = new Box<>();
+        Box<Duration> durationOfPreviousWaitPeriod = new Box<>();
+        ImmutableList.Builder<Duration> differencesInWaitPeriods = new ImmutableList.Builder<>();
+        try {
+            TryAndRetry
+                    .withAttemptsUpTo(20)
+                    .withNoWaitPeriod()
+                    .linearlyIncreasingBy(500, TimeUnit.MILLISECONDS)
+                    .executeUntilDoneThenGet(() -> {
+                        if (startOfWaitPeriod.hasContents()) {
+                            Duration durationOfCurrentWaitPeriod = Duration.between(startOfWaitPeriod.unbox(), Instant.now());
+                            Duration differenceBetweenWaitPeriods = durationOfCurrentWaitPeriod.minus(durationOfPreviousWaitPeriod.unbox());
+                            durationOfPreviousWaitPeriod.box(durationOfCurrentWaitPeriod);
+                            differencesInWaitPeriods.add(differenceBetweenWaitPeriods);
+                        }
+                        startOfWaitPeriod.box(Instant.now());
+                        throw new Exception("... so as to force a wait period ");
+                    });
+        } catch (TryAndRetryFailuresException ignored) {
+        }
+        differencesInWaitPeriods.build().forEach(differenceInWaitPeriods -> {
+            long millis = differenceInWaitPeriods.toMillis();
+            System.out.println(millis);
+            assertTrue(499 <= millis && millis <= 501);
+        });
     }
 
+    /**
+     * Tests to see that the time between attempts never exceeds the specified cap
+     *
+     * @throws Exception
+     */
     public void testUpTo() throws Exception {
-        // TODO
+        Box<Instant> startOfWaitPeriod = new Box<>();
+        Instant startTimer = Instant.now();
+        try {
+            TryAndRetry
+                    .withAttemptsUpTo(20)
+                    .withWaitPeriod(100, TimeUnit.MILLISECONDS)
+                    .linearlyIncreasingBy(10, TimeUnit.SECONDS)
+                    .upTo(2, TimeUnit.SECONDS)
+                    .executeUntilDoneThenGet(() -> {
+                        if (startOfWaitPeriod.hasContents()) {
+                            long secondsBetweenAttempts = Duration.between(startOfWaitPeriod.unbox(), Instant.now()).getSeconds();
+                            assertTrue("Seconds: " + secondsBetweenAttempts, secondsBetweenAttempts <= 2);
+                        }
+                        startOfWaitPeriod.box(Instant.now());
+                        throw new Exception("... so as to force a wait period ");
+                    });
+        } catch (TryAndRetryFailuresException ignored) {
+        }
+    }
+
+
+    /**
+     * Simple container class, because Java lambdas still don't do closure properly... >:[
+     *
+     * @param <T>
+     */
+    private static class Box<T> {
+
+        private T contents;
+
+        public void box(T object) {
+            this.contents = object;
+        }
+
+        public T unbox() {
+            return contents;
+        }
+
+        public boolean hasContents() {
+            return contents != null;
+        }
     }
 }
