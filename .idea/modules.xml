@@ -3,7 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/MoogleKiwi.iml" filepath="$PROJECT_DIR$/MoogleKiwi.iml" />
-      <module fileurl="file://$PROJECT_DIR$/MoogleKiwiJava/MoogleKiwiJava.iml" filepath="$PROJECT_DIR$/MoogleKiwiJava/MoogleKiwiJava.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Java/MoogleKiwiJava.iml" filepath="$PROJECT_DIR$/Java/MoogleKiwiJava.iml" />
     </modules>
   </component>
 </project>
