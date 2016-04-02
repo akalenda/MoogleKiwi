@@ -8,6 +8,13 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
+ * Devnote: Implementing Runnable and Callable with this clsas is surprisingly complicated. To do so, we would store
+ *      the Callable in the build phase instead of giving it on execution (so that it is part of the task's state).
+ *      However, this decouples the type information from that single method, forcing the compiler
+ *      to infer it unchecked. Since the actual thread executing the task is buried, TryAndRetryTask as a Callable or
+ *      Runnable would not behave as expected regarding thread-manipulation methods, therefore I do not think it wise
+ *      to implement those interfaces however tempting they may be.
+ *
  * @author https://github.com/akalenda
  * @see {@link TryAndRetry}
  */
@@ -19,6 +26,7 @@ public class TryAndRetryTask {
 
     private int attemptsMade = 0;
     private int attemptsAllowed = 0;
+    private long timeToWaitBeforeStarting = 0; // milliseconds
     private long initialWaitPeriod = 0; // milliseconds
     private long currentWaitPeriod = 0; // milliseconds
     private long waitPeriodIncrement = 0; // milliseconds
@@ -48,6 +56,16 @@ public class TryAndRetryTask {
     }
 
   /* ****************************** Modifiers *********************************************/
+
+    /**
+     * @param timeToWaitBeforeStarting - How many units of time to wait after execution is queued before actually invoking the given Callable
+     * @param units                    - What type of units to use; will be converted into TimeUnit.MILLISECONDS
+     * @see {@link TimeUnit#convert(long, TimeUnit)}
+     */
+    public TryAndRetryTask startingIn(long timeToWaitBeforeStarting, TimeUnit units) {
+        this.timeToWaitBeforeStarting = TimeUnit.MILLISECONDS.convert(timeToWaitBeforeStarting, units);
+        return this;
+    }
 
     /**
      * This is the default, but you could use it just to be explicit if you really wanted to...
@@ -176,20 +194,26 @@ public class TryAndRetryTask {
     public <T> T continueUntilDoneThenGet(Callable<T> lambda) throws TryAndRetryFailuresException {
         checkForConflictingModifiers();
         ImmutableList.Builder<Exception> collectedExceptions = new ImmutableList.Builder<>();
-        boolean shouldRetry = true;
-        while ((isPerpetual || attemptsMade < attemptsAllowed) && shouldRetry) {
-            attemptsMade++;
-            try {
-                return lambda.call();
-            } catch (Exception e) {
-                collectedExceptions.add(e);
-                shouldRetry = handleException(e);
+        try {
+            if (timeToWaitBeforeStarting > 0)
+                Thread.sleep(timeToWaitBeforeStarting);
+            boolean shouldRetry = true;
+            while ((isPerpetual || attemptsMade < attemptsAllowed) && shouldRetry) {
+                attemptsMade++;
                 try {
-                    maybeWaitBeforeRetry();
-                } catch (InterruptedException e1) {
-                    collectedExceptions.add(e1);
+                    return lambda.call();
+                } catch (Exception e) {
+                    collectedExceptions.add(e);
+                    shouldRetry = handleException(e);
+                    try {
+                        maybeWaitBeforeRetry();
+                    } catch (InterruptedException e1) {
+                        collectedExceptions.add(e1);
+                    }
                 }
             }
+        } catch (InterruptedException e) {
+            collectedExceptions.add(e);
         }
         throw collapse(collectedExceptions.build());
     }

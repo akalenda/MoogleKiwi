@@ -330,6 +330,25 @@ public class TryAndRetryTaskTest extends TestCase {
         assertTrue(executed.get());
     }
 
+    public void testStartingIn() {
+        int TEST_TIME = 10;
+        AtomicBoolean executed = new AtomicBoolean(false);
+        try {
+            Instant start = Instant.now();
+            TryAndRetry
+                    .withAttemptsUpTo(5)
+                    .startingIn(TEST_TIME, TimeUnit.SECONDS)
+                    .executeUntilDoneThenGet(() -> {
+                        executed.set(true);
+                        return 42;
+                    });
+            long duration = Duration.between(start, Instant.now()).getSeconds();
+            assertTrue("Execution started after only " + duration + " seconds.", duration >= TEST_TIME);
+        } catch (TryAndRetryFailuresException e) {
+            fail(e.toString());
+        }
+    }
+
     /**
      * Simple container class, because Java lambdas still don't do closure properly... >:[
      *
